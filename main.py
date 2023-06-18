@@ -82,7 +82,8 @@ if login_button or ('email' in st.session_state):
         # create an list of all selected activities
         activitytypes = st.multiselect(label='Which activities do you want to check?',
                                     options=activitytypes_options,
-                                    default=[activitytypes_options[0]])
+                                    default=["running"])
+
 
     df["distanceAdjElevation"] = df["distance"] + df["elevationGain"] * ELEVATION_CORRECTION_UP + df["elevationLoss"] * ELEVATION_CORRECTION_DOWN
 
@@ -101,6 +102,17 @@ if login_button or ('email' in st.session_state):
     if activitytypes != []:
         df = df.loc[df['activityType'].isin(activitytypes)]
 
+    st.divider()
+
+    st.header("Filter")
+
+    hr_filter_range = st.slider(label='Select a HR-range to filter', min_value=0, max_value=220, value=(118, 155))
+    pace_filter_range = st.slider(label='Select a Pace-range to filter', min_value=0.0, max_value=13.0, value=(6.2, 12.5))
+
+    df = df.loc[(df['averageHR'] > hr_filter_range[0]) & (df['averageHR'] < hr_filter_range[1])]
+    df = df.loc[(df['runningPace'] > pace_filter_range[0]) & (df['runningPace'] < pace_filter_range[1])]
+
+    print(pace_filter_range[0])
     df.dropna(axis='columns', inplace=True)
 
     df.drop(labels=["ownerId","ownerDisplayName", "eventType",
