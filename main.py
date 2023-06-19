@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import garmin_api as ga
+#import openpyxl
 
 ELEVATION_CORRECTION_UP = 4
 ELEVATION_CORRECTION_DOWN = -2
@@ -82,135 +83,148 @@ if login_button or ('email' in st.session_state):
         # create an list of all selected activities
         activitytypes = st.multiselect(label='Which activities do you want to check?',
                                     options=activitytypes_options,
-                                    default=["running"])
-
-
-    df["distanceAdjElevation"] = df["distance"] + df["elevationGain"] * ELEVATION_CORRECTION_UP + df["elevationLoss"] * ELEVATION_CORRECTION_DOWN
-
-    with col1:
-        st.text("Do you want to correct for elevation gain/loss?  -->")
-    with col2:
-        corr_for_elevation = st.checkbox(label="Enable elevation-correction",
-                                        help="""If the box is checked the distance will be corrected with the elevation gain and loss of each acitvity.\n
-                                                ELEVATION_CORRECTION_UP = + elevationGain * 4\n    ELEVATION_CORRECTION_DOWN = - elevationLoss * 2\n""")
-        
-    if corr_for_elevation:
-        df["runningPace"] = (df["duration"] / 60) / (df["distanceAdjElevation"] / 1000)
-    else:
-        df["runningPace"] = (df["duration"] / 60) / (df["distance"] / 1000)
+                                    default=["running"],
+                                    max_selections=1)
 
     if activitytypes != []:
         df = df.loc[df['activityType'].isin(activitytypes)]
+    
+        if activitytypes != ["indoor_cycling"]:
+            df["distanceAdjElevation"] = df["distance"] + df["elevationGain"] * ELEVATION_CORRECTION_UP + df["elevationLoss"] * ELEVATION_CORRECTION_DOWN
 
-    st.divider()
+            with col1:
+                st.text("Do you want to correct for elevation gain/loss?  -->")
+            with col2:
+                corr_for_elevation = st.checkbox(label="Enable elevation-correction",
+                                                help="""If the box is checked the distance will be corrected with the elevation gain and loss of each acitvity.\n
+                                                        ELEVATION_CORRECTION_UP = + elevationGain * 4\n    ELEVATION_CORRECTION_DOWN = - elevationLoss * 2\n""")
+                
+            if corr_for_elevation:
+                df["runningPace"] = (df["duration"] / 60) / (df["distanceAdjElevation"] / 1000)
+            else:
+                df["runningPace"] = (df["duration"] / 60) / (df["distance"] / 1000)
+        else:
+            df = df.loc[df['distance'] != 0]
+            df["runningPace"] = (df["duration"] / 60) / (df["distance"] / 1000)
 
-    st.header("Filter")
+        st.divider()
 
-    hr_filter_range = st.slider(label='Select a HR-range to filter', min_value=0, max_value=220, value=(118, 155))
-    pace_filter_range = st.slider(label='Select a Pace-range to filter', min_value=0.0, max_value=13.0, value=(6.2, 12.5))
+        st.header("Filter")
 
-    df = df.loc[(df['averageHR'] > hr_filter_range[0]) & (df['averageHR'] < hr_filter_range[1])]
-    df = df.loc[(df['runningPace'] > pace_filter_range[0]) & (df['runningPace'] < pace_filter_range[1])]
+        hr_filter_range = st.slider(label='Select a HR-range to filter', min_value=0, max_value=220, value=(118, 155))
+        df = df.loc[(df['averageHR'] > hr_filter_range[0]) & (df['averageHR'] < hr_filter_range[1])]
 
-    print(pace_filter_range[0])
-    df.dropna(axis='columns', inplace=True)
+        if activitytypes == ["running"]:
+            pace_filter_range = st.slider(label='Select a Pace-range to filter', min_value=0.0, max_value=13.0, value=(6.2, 12.5))
+            df = df.loc[(df['runningPace'] > pace_filter_range[0]) & (df['runningPace'] < pace_filter_range[1])]
 
-    df.drop(labels=["ownerId","ownerDisplayName", "eventType",
-                    "ownerFullName","ownerProfileImageUrlSmall",
-                    "ownerProfileImageUrlMedium","ownerProfileImageUrlLarge","userRoles",
-                    "privacy","summarizedDiveInfo","manufacturer",],axis='columns',inplace=True)
+        df.dropna(axis='columns', inplace=True)
 
-
-    x_dates = df["dates"]
-    x_unix = (df['datetime'] - pd.Timestamp("1970-01-01")) // pd.Timedelta('1s')
-    y_avarageHR = df["averageHR"]
-    y_averageSpeed = df["runningPace"]
-    if corr_for_elevation:
-        y_distance = df["distanceAdjElevation"] / 1000
-    else:
-        y_distance = df["distance"] / 1000
-        
-
-    # fig1, ax1 = plt.subplots()
-    # ax1.legend(args="Avarage HR", loc="upper left")
-
-    fig, ax  = plt.subplots(ncols=1, nrows=3, sharex=True, figsize=(10,7.5), dpi=300)
-
-    # make a dot plot for avarage HR
-    ax[0].scatter(x_dates, y_avarageHR, color="blue")
-    # Set the limits for y axis
-    ax[0].set_ylim(bottom=y_avarageHR.min()-5,top=y_avarageHR.max()+5)
-    # Set the grid on major and minor
-    ax[0].grid(visible=True, which="both")
-    # Rotate x-axis labels by 45 degrees
-    ax[0].tick_params(axis="x", rotation=45)
-    # calc fit and plot 
-    z = np.polyfit(x_unix, y_avarageHR, 1)
-    p = np.poly1d(z)
-    ax[0].plot(x_dates,p(x_unix),"r--")
-    # labeling and legend
-    ax[0].set_ylabel(ylabel="Avarage HR [ppm]")
-    ax[0].legend(["Avarage HR", "Lineare Regression"], loc="upper left")
+        df.drop(labels=["ownerId","ownerDisplayName", "eventType",
+                        "ownerFullName","ownerProfileImageUrlSmall",
+                        "ownerProfileImageUrlMedium","ownerProfileImageUrlLarge","userRoles",
+                        "privacy","summarizedDiveInfo","manufacturer",],axis='columns',inplace=True)
 
 
-    ax[1].scatter(x_dates,y_averageSpeed, color="green")
-    # Set the limits for y axis
-    ax[1].set_ylim(bottom=y_averageSpeed.min()-0.2,top=y_averageSpeed.max()+0.2)
-    # Set the grid on major and minor
-    ax[1].grid(visible=True, which="both")
-    # Rotate x-axis labels by 45 degrees
-    ax[1].tick_params(axis="x", rotation=45)
-    # calc fit and plot 
-    z = np.polyfit(x_unix, y_averageSpeed, 1)
-    p = np.poly1d(z)
-    ax[1].plot(x_dates,p(x_unix),"r--")
-    # labeling and legend
-    ax[1].set_ylabel(ylabel="Avarage Pace [min/km]")
-    ax[1].legend(["Avarage Pace", "Lineare Regression"], loc="upper left")
+        x_dates = df["dates"]
+        x_unix = (df['datetime'] - pd.Timestamp("1970-01-01")) // pd.Timedelta('1s')
+        y_avarageHR = df["averageHR"]
+        y_averageSpeed = df["runningPace"]
+        if activitytypes != ["indoor_cycling"]:
+            if corr_for_elevation:
+                y_distance = df["distanceAdjElevation"] / 1000
+            else:
+                y_distance = df["distance"] / 1000
+        else:
+            y_distance = df["distance"] / 1000    
+
+        #df.to_excel(excel_writer="output.xlsx")  
+
+        # fig1, ax1 = plt.subplots()
+        # ax1.legend(args="Avarage HR", loc="upper left")
+
+        fig, ax  = plt.subplots(ncols=1, nrows=3, sharex=True, figsize=(10,7.5), dpi=300)
+
+        # make a dot plot for avarage HR
+        ax[0].scatter(x_dates, y_avarageHR, color="blue")
+        # Set the limits for y axis
+        ax[0].set_ylim(bottom=y_avarageHR.min()-5,top=y_avarageHR.max()+5)
+        # Set the grid on major and minor
+        ax[0].grid(visible=True, which="both")
+        # Rotate x-axis labels by 45 degrees
+        ax[0].tick_params(axis="x", rotation=45)
+        # calc fit and plot 
+        z = np.polyfit(x_unix, y_avarageHR, 1)
+        p = np.poly1d(z)
+        ax[0].plot(x_dates,p(x_unix),"r--")
+        # labeling and legend
+        ax[0].set_ylabel(ylabel="Avarage HR [ppm]")
+        ax[0].legend(["Avarage HR", "Lineare Regression"], loc="upper left")
 
 
-    ax[2].scatter(x_dates,y_distance, color="orange")
-    # Set the limits for y axis
-    ax[2].set_ylim(bottom=y_distance.min()-0.5,top=y_distance.max()+0.5)
-    # Set the grid on major and minor
-    ax[2].grid(visible=True, which="both")
-    # Rotate x-axis labels by 45 degrees
-    ax[2].tick_params(axis="x", rotation=45)
-    # calc fit and plot 
-    z = np.polyfit(x_unix, y_distance, 1)
-    p = np.poly1d(z)
-    ax[2].plot(x_dates,p(x_unix),"r--")
-    # labeling and legend
-    ax[2].set_ylabel(ylabel="Distance [km]")
-    ax[2].legend(["Distance", "Lineare Regression"], loc="upper left")
+        ax[1].scatter(x_dates,y_averageSpeed, color="green")
+        # Set the limits for y axis
+        ax[1].set_ylim(bottom=y_averageSpeed.min()-0.2,top=y_averageSpeed.max()+0.2)
+        # Set the grid on major and minor
+        ax[1].grid(visible=True, which="both")
+        # Rotate x-axis labels by 45 degrees
+        ax[1].tick_params(axis="x", rotation=45)
+        # calc fit and plot 
+        z = np.polyfit(x_unix, y_averageSpeed, 1)
+        p = np.poly1d(z)
+        ax[1].plot(x_dates,p(x_unix),"r--")
+        # labeling and legend
+        ax[1].set_ylabel(ylabel="Avarage Pace [min/km]")
+        ax[1].legend(["Avarage Pace", "Lineare Regression"], loc="upper left")
 
-    fig.set_figheight(9)
 
-    st.pyplot(fig)
-    st.divider()
+        ax[2].scatter(x_dates,y_distance, color="orange")
+        # Set the limits for y axis
+        ax[2].set_ylim(bottom=y_distance.min()-0.5,top=y_distance.max()+0.5)
+        # Set the grid on major and minor
+        ax[2].grid(visible=True, which="both")
+        # Rotate x-axis labels by 45 degrees
+        ax[2].tick_params(axis="x", rotation=45)
+        # calc fit and plot 
+        z = np.polyfit(x_unix, y_distance, 1)
+        p = np.poly1d(z)
+        ax[2].plot(x_dates,p(x_unix),"r--")
+        # labeling and legend
+        ax[2].set_ylabel(ylabel="Distance [km]")
+        ax[2].legend(["Distance", "Lineare Regression"], loc="upper left")
 
-    st.subheader("Scatterplot")
-    st.text("Below is a scatterplot depicting the data for Heart Rate, Pace, and Distance.\nEach dot's size corresponds to the distance, while the color scheme represents the pace.\nThe y-axis represents Heart Rate.")
-    # https://plotly.com/python-api-reference/generated/plotly.express.scatter.html
-    # https://plotly.com/python/axes/#set-number-of-tick-marks-and-grid-lines
-    if corr_for_elevation:
-        fig_plotly = px.scatter(data_frame=df, x="dates", y="averageHR", size="distanceAdjElevation",
+        fig.set_figheight(9)
+
+        st.pyplot(fig)
+        st.divider()
+
+        st.subheader("Scatterplot")
+        st.text("Below is a scatterplot depicting the data for Heart Rate, Pace, and Distance.\nEach dot's size corresponds to the distance, while the color scheme represents the pace.\nThe y-axis represents Heart Rate.")
+        # https://plotly.com/python-api-reference/generated/plotly.express.scatter.html
+        # https://plotly.com/python/axes/#set-number-of-tick-marks-and-grid-lines
+        if activitytypes == ["running"]:
+            if corr_for_elevation:
+                fig_plotly = px.scatter(data_frame=df, x="dates", y="averageHR", size="distanceAdjElevation",
+                                        color='runningPace', color_continuous_scale='Bluered_r',
+                                        labels=dict(dates="", runningPace="Pace [min/km]", averageHR="Average HR [ppm]", distanceAdjElevation="Distance [m]"))
+            else:
+                fig_plotly = px.scatter(data_frame=df, x="dates", y="averageHR", size="distance",
                                 color='runningPace', color_continuous_scale='Bluered_r',
                                 labels=dict(dates="", runningPace="Pace [min/km]", averageHR="Average HR [ppm]", distanceAdjElevation="Distance [m]"))
-    else:
-        fig_plotly = px.scatter(data_frame=df, x="dates", y="averageHR", size="distance",
-                        color='runningPace', color_continuous_scale='Bluered_r',
-                        labels=dict(dates="", runningPace="Pace [min/km]", averageHR="Average HR [ppm]", distanceAdjElevation="Distance [m]"))
+        else:
+            fig_plotly = px.scatter(data_frame=df, x="dates", y="averageHR", size="distance",
+                                color='runningPace', color_continuous_scale='Bluered_r',
+                                labels=dict(dates="", runningPace="Pace [min/km]", averageHR="Average HR [ppm]", distanceAdjElevation="Distance [m]"))
+            
+        fig_plotly.update_xaxes(tickangle=-45,showticklabels=True, showgrid=True)
 
-    fig_plotly.update_xaxes(tickangle=-45,showticklabels=True, showgrid=True)
+        st.plotly_chart(fig_plotly, use_container_width=True)
 
-    st.plotly_chart(fig_plotly, use_container_width=True)
-
-    st.title('Raw Table')
-    st.table(df)
+        st.title('Raw Table')
+        st.table(df)
 
 
-    logging.info('Stopped')
+        logging.info('Stopped')
 
 else:
     st.warning("Please login with your Garmin credentials")
