@@ -198,6 +198,18 @@ if login_button or ('email' in st.session_state):
         st.pyplot(fig)
         st.divider()
 
+        # Create column with YYYY-WW (year-calenderweek) time-stamp
+        df["year_week"] = pd.to_datetime(df['startTimeLocal']).dt.strftime('%Y-%U')
+        # Get the sum of meters run in every week
+        weekly_volume = df[["year_week","distance"]].groupby(by=["year_week"] ).sum()
+        # get kilometers instead of meters
+        weekly_volume["distance"] = weekly_volume["distance"] / 1000
+        st.subheader("Weekly Volume")
+        st.text("Weekly volume in kilometers for running is the sum distance a runner travels over the course of a week, indicating their training intensity and endurance level. It's a key metric in assessing a runners overall running progress and fitness.")
+        st.bar_chart(weekly_volume)
+
+        st.divider()
+
         st.subheader("Scatterplot")
         st.text("Below is a scatterplot depicting the data for Heart Rate, Pace, and Distance.\nEach dot's size corresponds to the distance, while the color scheme represents the pace.\nThe y-axis represents Heart Rate.")
         # https://plotly.com/python-api-reference/generated/plotly.express.scatter.html
@@ -221,7 +233,8 @@ if login_button or ('email' in st.session_state):
         st.plotly_chart(fig_plotly, use_container_width=True)
 
         st.title('Raw Table')
-        st.table(df)
+        st.text("disabled for now...")
+        #st.table(df)
 
 
         logging.info('Stopped')
