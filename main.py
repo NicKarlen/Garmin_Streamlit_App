@@ -115,7 +115,7 @@ if login_button or ('email' in st.session_state):
         df = df.loc[(df['averageHR'] > hr_filter_range[0]) & (df['averageHR'] < hr_filter_range[1])]
 
         if activitytypes == ["running"]:
-            pace_filter_range = st.slider(label='Select a Pace-range to filter', min_value=0.0, max_value=13.0, value=(6.2, 12.5))
+            pace_filter_range = st.slider(label='Select a Pace-range to filter', min_value=0.0, max_value=13.0, value=(4.8, 12.5))
             df = df.loc[(df['runningPace'] > pace_filter_range[0]) & (df['runningPace'] < pace_filter_range[1])]
 
         df.dropna(axis='columns', inplace=True)
